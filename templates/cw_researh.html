@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}差旅费明细表检索工具{% endblock %}
+{% block scripts %}
+    {{ super() }}
+    <script>
+        $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+        var token = document.getElementById("token").innerHTML;
+        var username = document.getElementById("username").innerHTML;
+        $("#reseach_btn").click(
+            function () {
+                if ((token && username) !== '' && (token && username) !== null && (token && username) !== undefined) {
+                    var no = $("#clf_no").val();
+                    if (no !== '' && no !== null && no !== undefined) {
+                        $.ajax({
+                            cache: false,
+                            type: 'POST',
+                            url: $SCRIPT_ROOT + "/travel_expense/post/varifyinput?token=" + token + '&username=' + username + '&no=' + no,
+
+                            success: function (data, status) {
+                                if (data == 404) {
+                                    alert("输入的编号有误，请重新输入")
+                                }
+                                else if (data == 200) {
+                                     window.open('/travel_expense/showForm_cw?token=' + token + '&username=' + username + '&no=' + no);
+                                }
+                                else if (data == 2) {
+                                    alert("登陆超时，请刷新页面重新提交");
+                                }
+
+                            }
+                        });
+
+                    }
+
+                }
+
+            });
+        function input_isNumber(value) {
+            if (isNaN(Number($.trim(value)))) {
+                document.getElementById('clf_no').value = "";
+            }
+        }
+    </script>
+{% endblock %}
+{% block navbar %}
+    <div id="token" style="display:none">{{ token }}</div>
+    <div id="username" style="display:none">{{ username }}</div>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <div class="container">
+            <div class="text-center">
+                <h3>差旅费明细表检索工具（财务中心专用）</h3>
+            </div>
+            <div class="input-group">
+                <label for="clf_no"></label>
+                <input id="clf_no" type="text" class="form-control input-lg" onchange="input_isNumber(this.value)"
+                       placeholder="请输入差旅费明细表编号（No）"><span id="reseach_btn"
+                                                           class="input-group-addon btn btn-primary">搜索</span>
+            </div>
+
+        </div>
+
+    </div>
+{% endblock %}

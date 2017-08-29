@@ -1,0 +1,3460 @@
+{% extends "base.html" %}
+{% block title %}差旅费报销明细{% endblock %}
+{% block scripts %}
+    {{ super() }}
+    <script>
+        window.onload = function () {
+            var status = $("#status").html();
+            if (status === "0" || status === "1") {
+                document.getElementById("html2print").disabled = true;
+            } else {
+                $("#status_context").css("display", "none");
+                $("button").attr("disabled", true);
+                $('input').attr("readonly", true);
+                $('textarea').attr("readonly", "readonly");
+                document.getElementById("html2print").disabled = false;
+                document.getElementById("close_window").disabled = false;
+                document.getElementById("modal_wd_close").disabled = false;
+                document.getElementById("modal_close").disabled = false;
+                document.getElementById("mini_close").disabled = false;
+                $.fn.editable.defaults.disabled = true;
+
+            }
+
+        };
+        function fomateDate(oDate, sFomate, bZone) {
+            sFomate = sFomate.replace("YYYY", oDate.getFullYear());
+            sFomate = sFomate.replace("YY", String(oDate.getFullYear()).substr(2));
+            sFomate = sFomate.replace("MM", oDate.getMonth() + 1);
+            sFomate = sFomate.replace("DD", oDate.getDate());
+            sFomate = sFomate.replace("hh", oDate.getHours());
+            sFomate = sFomate.replace("mm", oDate.getMinutes());
+            sFomate = sFomate.replace("ss", oDate.getSeconds());
+            if (bZone) sFomate = sFomate.replace(/\b(\d)\b/g, '0$1');
+            return sFomate;
+        }
+        now_date = fomateDate(new Date(), 'YYYY-MM-DD');
+        $("#apply_date").val(now_date);
+        function uuid() {
+            var s = [];
+            var hexDigits = "0123456789abcdef";
+            for (var i = 0; i < 36; i++) {
+                s[i] = hexDigits.substr(Math.floor(Math.random() * 0x10), 1);
+            }
+            s[14] = "4";  // bits 12-15 of the time_hi_and_version field to 0010
+            s[19] = hexDigits.substr((s[19] & 0x3) | 0x8, 1);  // bits 6-7 of the clock_seq_hi_and_reserved to 01
+            s[8] = s[13] = s[18] = s[23] = "-";
+            var uuid = s.join("");
+            return uuid;
+        }
+        $('#myModal').on('shown.bs.modal', function () {
+            $('#myInput').focus()
+        })
+    </script>
+    <script>
+        $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+        $.fn.editable.defaults.onblur = 'submit';
+        $sub_table_1 = $('#sub_table');
+        selections = [];
+        $add_btn = $('#b_add');
+        $del_btn = $('#b_del');
+        function update_data() {
+            var ph1 = JSON.stringify($sub_table_1.bootstrapTable('getData'));
+            var table_array = jQuery.parseJSON(ph1);
+            var one_line_hotle_male = [];
+            var one_line_hotle_female = [];
+            var other_line_hotle_male = [];
+            var other_line_hotle_female = [];
+            var final_one_line_traffic = [];
+            var final_one_line_meals = [];
+            var final_other_line_traffic = [];
+            var final_other_line_meals = [];
+            for (var i in table_array) {
+                var job_level = table_array[i].job_level;
+                var travel_days_one = table_array[i].travel_days_one;
+                var travel_days_other = table_array[i].travel_days_other;
+                var table_sex = table_array[i].sex;
+                var table_id = table_array[i].id;
+                $.ajax({
+                    url: $SCRIPT_ROOT + '/static/standard.json',
+                    async: false,
+                    type: "get",
+                    data: {},
+                    success: function (data, status) {
+                        var json_array = jQuery.parseJSON(data);
+                        for (var j in json_array) {
+                            var jid = json_array[j].id;
+                            var jduty = json_array[j].duty;
+                            var one_line_hotle = json_array[j].one_line_hotle;
+                            var one_line_traffic = json_array[j].one_line_traffic;
+                            var one_line_meals = json_array[j].one_line_meals;
+                            var other_line_hotle = json_array[j].other_line_hotle;
+                            var other_line_traffic = json_array[j].other_line_traffice;
+                            var other_line_meals = json_array[j].other_line_meals;
+                            var travel_days_one_fix = 0;
+                            var travel_days_other_fix = 0;
+                            if (job_level === jduty) {
+                                if (table_sex === '1') {
+                                    if ((travel_days_one !== '0' &&
+                                        travel_days_one !== '' && travel_days_one !== null && travel_days_one !== undefined)
+                                        && (travel_days_other !== '0' &&
+                                        travel_days_other !== '' && travel_days_other !== null && travel_days_other !== undefined)) {
+                                        travel_days_one_fix += Number(travel_days_one);
+                                        travel_days_other_fix += Number(travel_days_other) - 1;
+                                    } else if ((travel_days_one !== '0' &&
+                                        travel_days_one !== '' && travel_days_one !== null && travel_days_one !== undefined)
+                                        && (travel_days_other === '0' ||
+                                        travel_days_other === '' || travel_days_other === null || travel_days_other === undefined)) {
+                                        travel_days_one_fix += Number(travel_days_one) - 1;
+                                    } else if ((travel_days_other !== '0' &&
+                                        travel_days_other !== '' && travel_days_other !== null && travel_days_other !== undefined)
+                                        && (travel_days_one === '0' ||
+                                        travel_days_one === '' || travel_days_one === null || travel_days_one === undefined)) {
+                                        travel_days_other_fix += Number(travel_days_other) - 1;
+                                    }
+                                    one_line_hotle_male.push(Number(one_line_hotle) * travel_days_one_fix);
+                                    other_line_hotle_male.push(Number(other_line_hotle) * travel_days_other_fix);
+                                }
+                                else if (table_sex === '2') {
+                                    if ((travel_days_one !== '0' &&
+                                        travel_days_one !== '' && travel_days_one !== null && travel_days_one !== undefined)
+                                        && (travel_days_other !== '0' &&
+                                        travel_days_other !== '' && travel_days_other !== null && travel_days_other !== undefined)) {
+                                        travel_days_one_fix += Number(travel_days_one);
+                                        travel_days_other_fix += Number(travel_days_other) - 1;
+                                    } else if ((travel_days_one !== '0' &&
+                                        travel_days_one !== '' && travel_days_one !== null && travel_days_one !== undefined)
+                                        && (travel_days_other === '0' ||
+                                        travel_days_other === '' || travel_days_other === null || travel_days_other === undefined)) {
+                                        travel_days_one_fix += Number(travel_days_one) - 1;
+                                    } else if ((travel_days_other !== '0' &&
+                                        travel_days_other !== '' && travel_days_other !== null && travel_days_other !== undefined)
+                                        && (travel_days_one === '0' ||
+                                        travel_days_one === '' || travel_days_one === null || travel_days_one === undefined)) {
+
+                                        travel_days_other_fix += Number(travel_days_other) - 1;
+                                    }
+                                    one_line_hotle_female.push(Number(one_line_hotle) * travel_days_one_fix);
+                                    other_line_hotle_female.push(Number(other_line_hotle) * travel_days_other_fix);
+
+                                }
+                                final_one_line_traffic.push(Number(one_line_traffic) * Number(travel_days_one));
+                                final_one_line_meals.push(Number(one_line_meals) * Number(travel_days_one));
+                                final_other_line_traffic.push(Number(other_line_traffic) * Number(travel_days_other));
+                                final_other_line_meals.push(Number(other_line_meals) * Number(travel_days_other));
+                            }
+                        }
+                    }
+                });
+            }
+            var cot_one_final_array = cot_all_array(get_final_array(one_line_hotle_male), get_final_array(one_line_hotle_female));
+            var cot_other_final_array = cot_all_array(get_final_array(other_line_hotle_male), get_final_array(other_line_hotle_female));
+            var total_sum_one = calSum(cot_one_final_array);
+            var total_sum_other = calSum(cot_other_final_array);
+            var total_sum_traffic_one = calSum(final_one_line_traffic);
+            var total_sum_traffic_other = calSum(final_other_line_traffic);
+            var total_sum_meals_one = calSum(final_one_line_meals);
+            var total_sum_meals_other = calSum(final_other_line_meals);
+            document.getElementById("hotel_one").value = total_sum_one + total_sum_other;
+            document.getElementById("traffic_one").value = total_sum_traffic_one + total_sum_traffic_other;
+            document.getElementById("meals_one").value = total_sum_meals_one + total_sum_meals_other;
+            document.getElementById("total_urban_standard_cost").value = total_sum_traffic_one + total_sum_traffic_other;
+            document.getElementById("total_hotel_standard_cost").value = total_sum_one + total_sum_other;
+            document.getElementById("total_meals_standard_cost").value = total_sum_meals_one + total_sum_meals_other;
+
+        }
+        $sub_table_1.bootstrapTable({
+            idField: "id",
+            editable: true,
+            cache: false,
+            columns: [[{
+                title: '出差人员明细',
+                colspan: 9,
+                align: 'center'
+            }
+            ], [{
+                field: 'state',
+                checkbox: true,
+                width: 50,
+                rowspan: 2
+            }, {
+                field: 'id',
+                title: '序号',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                visible: false,
+
+            }, {
+                field: 'name',
+                title: '出差人',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    type: 'text',
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'job_level',
+                title: '职务级别',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    type: 'select',
+                    title: '职务级别',
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    showbuttons: false,
+                    source: function () {
+                        var result = [];
+                        $.ajax({
+                            url: '/static/standard.json',
+                            async: false,
+                            type: "get",
+                            data: {},
+                            success: function (data, status) {
+                                var json_array = jQuery.parseJSON(data);
+                                for (var i in json_array) {
+                                    var jid = json_array[i].id;
+                                    var jduty = json_array[i].duty;
+                                    result.push({value: jduty, text: jduty});
+                                }
+                            }
+                        });
+                        return result;
+                    },
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'sex',
+                title: '性别',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    type: 'select',
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    showbuttons: false,
+                    source: [{value: "1", text: "男"}, {value: "2", text: "女"}],
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                title: '一线城市',
+                colspan: 2,
+                align: 'center'
+            }, {
+                title: '其他城市',
+                colspan: 2,
+                align: 'center'
+            }],
+                [
+                    {
+                        field: 'travel_city_one',
+                        title: '出差城市',
+                        align: 'center',
+                        valign: 'middle',
+
+                        editable: {
+                            emptytext: '点击编辑',          //空值的默认文本
+                            mode: 'inline',
+                            type: "checklist",
+                            separator: ",",
+                            title: '出差城市',
+                            source: $SCRIPT_ROOT + '/static/one_city.json',
+                            validate: function (value) {
+                                if ($.trim(value) === '') {
+                                    return '不能为空!';
+                                }
+                            }
+                        }
+                    },
+
+                    {
+                        field: 'travel_days_one',
+                        title: '出差天数',
+                        align: 'center',
+                        valign: 'middle',
+                        editable: {
+                            emptytext: '点击编辑',          //空值的默认文本
+                            mode: 'inline',
+                            type: 'text',
+                            validate: function (value) {
+                                if ($.trim(value) === '') {
+                                    return '不能为空！';
+                                }
+                                if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                                    return ('请输入天数！')
+                                }
+                            }
+                        }
+                    }, {
+                    field: 'travel_city_other',
+                    title: '出差城市',
+                    align: 'center',
+                    valign: 'middle',
+                    editable: {
+                        emptytext: '点击编辑',          //空值的默认文本
+                        mode: 'inline',
+                        type: 'text',
+                        validate: function (value) {
+                            if ($.trim(value) === '') {
+                                return '不能为空！';
+                            }
+                        }
+                    }
+                }, {
+                    field: 'travel_days_other',
+                    title: '出差天数',
+                    align: 'center',
+                    valign: 'middle',
+                    editable: {
+                        emptytext: '点击编辑',          //空值的默认文本
+                        mode: 'inline',
+                        type: 'text',
+                        validate: function (value) {
+                            if ($.trim(value) === '') {
+                                return '不能为空！';
+                            }
+                            if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                                return ('请输入天数！')
+                            }
+                        }
+                    }
+                }
+                ]
+            ],
+            onEditableSave: function (field, row, oldValue, $el) {
+            },
+            onEditableHidden: function (field, row, $el, reason) {
+                if (field === 'travel_days_one') {
+                    update_data();
+                } else if (field === 'travel_days_other') {
+                    update_data();
+                } else if (field === 'job_level') {
+                    update_data();
+                } else if (field === 'sex') {
+                    update_data();
+                }
+
+            },
+            data: [
+                {
+                    id: uuid(),
+                    name: '',
+                    job_level: '',
+                    sex: '',
+                    travel_city_one: '',
+                    travel_days_one: '',
+                    travel_city_other: '',
+                    travel_days_other: ''
+                }
+            ]
+        });
+        $(function () {
+            $add_btn.click(function () {
+                var index = $sub_table_1.bootstrapTable('getData').length;
+                var id = Number(index + 1);
+                $sub_table_1.bootstrapTable('insertRow', {
+                    index: index,
+                    row: {
+                        id: uuid(),
+                        name: '',
+                        job_level: '',
+                        sex: '',
+                        travel_city_one: '',
+                        travel_days_one: '',
+                        travel_city_other: '',
+                        travel_days_other: ''
+                    }
+                });
+            });
+            $del_btn.click(function () {
+                var ids = $.map($sub_table_1.bootstrapTable('getSelections'), function (row) {
+                    return row.id;
+                });
+                if (ids.length < 1) {
+                    alert("请选择一行删除!");
+                    return;
+                }
+                var selectedIDs_list = [];
+                for (var i = 0; i < ids.length; i++) {
+                    var info = {"selectedID": String(ids[i])};
+                    selectedIDs_list.push(info);
+                }
+
+                var token = document.getElementById("token").innerHTML;
+                var username = document.getElementById("username").innerHTML;
+                var cno = $("#clf_no").val();
+                var status = $("#status").html();
+                if (status === "0") {
+                    {#                    console.log("新增状态下删除"+JSON.stringify(ids));#}
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/1?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_1.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_1.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+                            }
+                        }
+                    });
+                    $sub_table_1.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                } else if (status === "1") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/1?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_1.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_1.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+
+                            }
+                        }
+                    });
+                    $sub_table_1.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+
+                } else if (status === "2") {
+                    {#                    console.log("提交下禁止删除")#}
+                }
+            });
+        });
+        function calSum(arr) {
+            var sum = 0;
+            if (arr.length !== 0) {
+                var str_arr = arr.toString();
+                var arr_ph2 = str_arr.split(',');
+                for (var j = 0; j < arr_ph2.length; j++) {
+                    sum += Number(arr_ph2[j]);
+                }
+
+            }
+            return sum;
+        }
+        function get_final_array(arr) {
+            var final_array = [];
+            var mod_result = parseInt(arr.length / 2);
+            if (mod_result !== 0) {
+                var sort_array = arr.sort(sortNumber);
+                {#                        alert("住宿标准为1："+sort_array.slice(0,mod_result));#}
+                final_array.push(sort_array.slice(0, mod_result));
+                if (arr.length % 2 !== 0) {
+                    {#                                        alert("单房标准为："+sort_array.slice(mod_result,mod_result+1));#}
+                    final_array.push(sort_array.slice(mod_result, mod_result + 1))
+                }
+            } else {
+                var simple_array = arr[0];
+                {#                        alert("住宿标准为0："+simple_array);#}
+                final_array.push(simple_array);
+                {#                        alert("单人标准："+final_array)#}
+            }
+            return final_array;
+        }
+        function sortNumber(a, b) {
+            return b - a
+        }
+        function cot_all_array(arr1, arr2) {
+            var one_final_array = [];
+            var cot_one_final_array = [];
+            if (arr1.length !== 0 && arr2.length !== 0) {
+                cot_one_final_array = one_final_array.concat(arr1, arr2);
+            } else if (arr1.length !== 0 && arr2.length === 0) {
+                cot_one_final_array = one_final_array.concat(arr1);
+            } else if (arr1.length === 0 && arr2.length !== 0) {
+                cot_one_final_array = one_final_array.concat(arr2);
+            } else {
+                cot_one_final_array = [0]
+            }
+            return cot_one_final_array
+        }
+    </script>
+    <script>
+        function calculate_total(tb, tbcolumn) {
+            var sum = 0;
+            var sum_real_cost = 0;
+            var ph1 = JSON.stringify($('#' + tb).bootstrapTable('getData'));
+            var table_array = jQuery.parseJSON(ph1);
+            switch (tbcolumn) {
+                case 2:
+                    document.getElementById("total_travel_real_cost").innerHTML = '';
+                    document.getElementById("total_travel_standard_cost").innerHTML = '';
+                    document.getElementById("final_travel_real_cost").innerHTML = '';
+                    document.getElementById("final_travel_standard_cost").innerHTML = '';
+                    for (var i in table_array) {
+                        sum += Number(table_array[i].travel_stand_cost);
+                        sum_real_cost += Number(table_array[i].travel_real_cost);
+                    }
+                    $("#total_travel_real_cost").val(sum_real_cost);
+                    $("#total_travel_standard_cost").val(sum);
+                    $("#final_travel_real_cost").append(sum_real_cost);
+                    $("#final_travel_standard_cost").append(sum);
+                    break;
+                case 3:
+                    document.getElementById("total_urban_standard_cost").innerHTML = '';
+                    document.getElementById("total_urban_real_cost").innerHTML = '';
+                    document.getElementById("final_urban_real_cost").innerHTML = '';
+                    document.getElementById("final_urban_standard_cost").innerHTML = '';
+                    for (var i in table_array) {
+                        sum_real_cost += Number(table_array[i].urban_transport_cost);
+                    }
+                    var urban_standard_cost = $("#traffic_one").val();
+                    $("#total_urban_real_cost").val(sum_real_cost);
+                    $("#total_urban_standard_cost").val(urban_standard_cost);
+                    $("#final_urban_real_cost").append(sum_real_cost);
+                    $("#final_urban_standard_cost").append(urban_standard_cost);
+                    break;
+                case 4:
+                    document.getElementById("total_hotel_real_cost").innerHTML = '';
+                    document.getElementById("total_hotel_standard_cost").innerHTML = '';
+                    document.getElementById("final_hotel_real_cost").innerHTML = '';
+                    document.getElementById("final_hotel_standard_cost").innerHTML = '';
+                    for (var i in table_array) {
+                        sum_real_cost += Number(table_array[i].hotel_cost);
+                    }
+                    $("#total_hotel_real_cost").val(sum_real_cost);
+                    $("#total_hotel_standard_cost").val($("#hotel_one").val());
+                    $("#final_hotel_real_cost").append(sum_real_cost);
+                    $("#final_hotel_standard_cost").append(urban_standard_cost);
+                    break;
+                case 5:
+                    document.getElementById("total_meals_real_cost").innerHTML = '';
+                    document.getElementById("total_meals_standard_cost").innerHTML = '';
+                    document.getElementById("final_meals_real_cost").innerHTML = '';
+                    document.getElementById("final_meals_standard_cost").innerHTML = '';
+                    for (var i in table_array) {
+                        sum_real_cost += Number(table_array[i].restaurant_cost);
+                    }
+                    var meals_standard_cost = $("#meals_one").val();
+                    $("#total_meals_real_cost").val(sum_real_cost);
+                    $("#total_meals_standard_cost").val(meals_standard_cost);
+                    $("#final_meals_real_cost").append(sum_real_cost);
+                    $("#final_meals_standard_cost").append(urban_standard_cost);
+                    break;
+                case 6:
+                    document.getElementById("total_restaurant_real_cost").innerHTML = '';
+                    document.getElementById("final_restaurant_real_cost").innerHTML = '';
+                    for (var i in table_array) {
+                        sum_real_cost += Number(table_array[i].restaurant_cost);
+                    }
+                    $("#total_restaurant_real_cost").val(sum_real_cost);
+                    $("#final_restaurant_real_cost").append(sum_real_cost);
+                    break;
+                case 7:
+                    document.getElementById("total_other_real_cost").innerHTML = '';
+                    document.getElementById("final_other_real_cost").innerHTML = '';
+                    for (var i in table_array) {
+                        sum_real_cost += Number(table_array[i].other_cost);
+                    }
+                    $("#total_other_real_cost").val(sum_real_cost);
+                    $("#final_other_real_cost").append(sum_real_cost);
+                    break;
+            }
+        }
+        traval_pos_data = [{value: "1", text: "头等舱"}, {value: "2", text: "商务舱"}, {value: "3", text: "高端经济舱"},
+            {value: "4", text: "经济舱"}, {value: "5", text: "包厢"}, {value: "6", text: "软卧"}, {value: "7", text: "硬卧"},
+            {value: "8", text: "商务座"}, {value: "9", text: "一等座"}, {value: "10", text: "二等座"}, {value: "11", text: "硬座"},
+            {value: "12", text: "头等舱"}, {value: "13", text: "一等舱"}, {value: "14", text: "二等舱"}, {
+                value: "15",
+                text: "长途大巴车"
+            }];
+        moment.locale('zh-cn');
+        $sub_table_2 = $('#sub_table_2');
+        $tb2_add_btn = $('#tb_2_add');
+        $tb2_del_btn = $('#tb_2_del');
+        $tb2_cal_btn = $('#tb_2_cal');
+        selections = [];
+        $sub_table_2.bootstrapTable({
+            editable: true,
+            cache: false,
+            idField: "id",
+            columns: [[{
+                title: '旅途交通明细',
+                colspan: 11,
+                align: 'center'
+            }], [{
+                field: 'state',
+                checkbox: true,
+                width: 50,
+                rowspan: 2
+            }, {
+                field: 'id',
+                title: '序号',
+                align: 'center',
+                valign: 'middle',
+                visible: false,
+                rowspan: 2,
+            }, {
+                field: 'item',
+                title: '费用项目',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    type: 'select',
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    showbuttons: false,
+                    source: [{value: "1", text: "飞机"}, {value: "2", text: "火车"}, {value: "3", text: "轮渡"},
+                        {value: "4", text: "长途车"}],
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'datetime',
+                title: '日期/时间',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    type: 'combodate',
+                    emptytext: '点击编辑',        //空值的默认文本
+                    locale: 'zh-cn',
+                    format: 'YYYY-MM-DD HH:mm',
+                    template: 'YYYY 年 MMM / D 日  HH : mm',
+                    combodate: {
+                        minYear: 2017,
+						maxYear: 2023,
+                        firstItem: 'name'
+                    },
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                title: '行程',
+                colspan: 2,
+                align: 'center'
+            }, {
+                title: '实际费用',
+                colspan: 2,
+                align: 'center'
+            }, {
+                title: '报销标准',
+                colspan: 2,
+                align: 'center'
+            }, {
+                field: 'travel_reason',
+                title: '具体内容',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'popup',
+                    type: "textarea",
+                    rows: 5,
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }],
+                [
+                    {
+                        field: 'travel_departure',
+                        title: '出发地',
+                        align: 'center',
+                        valign: 'middle',
+                        editable: {
+                            emptytext: '点击编辑',          //空值的默认文本
+                            mode: 'inline',
+                            type: "text",
+                            validate: function (value) {
+                                if ($.trim(value) === '') {
+                                    return '不能为空!';
+                                }
+                            }
+                        }
+                    },
+                    {
+                        field: 'travel_destination',
+                        title: '目的地',
+                        align: 'center',
+                        valign: 'middle',
+                        editable: {
+                            emptytext: '点击编辑',          //空值的默认文本
+                            mode: 'inline',
+                            type: 'text',
+                            validate: function (value) {
+                                if ($.trim(value) === '') {
+                                    return '不能为空！';
+                                }
+                            }
+                        }
+                    }, {
+                    field: 'travel_real_position',
+                    title: '仓位',
+                    align: 'center',
+                    valign: 'middle',
+                    editable: {
+                        type: 'select',
+                        emptytext: '点击编辑',          //空值的默认文本
+                        mode: 'inline',
+                        showbuttons: false,
+                        source: traval_pos_data,
+                        validate: function (value) {
+                            if ($.trim(value) === '') {
+                                return '不能为空!';
+                            }
+                        }
+                    }
+                }, {
+                    field: 'travel_real_cost',
+                    title: '金额',
+                    align: 'center',
+                    valign: 'middle',
+                    editable: {
+                        emptytext: '点击编辑',          //空值的默认文本
+                        mode: 'inline',
+                        type: 'text',
+                        validate: function (value) {
+                            if ($.trim(value) === '') {
+                                return '不能为空！';
+                            }
+                            if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                                return ('请输入金额！')
+                            }
+                        }
+                    }
+                }, {
+                    field: 'travel_stand_position',
+                    title: '仓位',
+                    align: 'center',
+                    valign: 'middle',
+                    editable: {
+                        emptytext: '点击编辑',          //空值的默认文本
+                        mode: 'inline',
+                        type: 'select',
+                        showbuttons: false,
+                        source: traval_pos_data,
+                        validate: function (value) {
+                            if ($.trim(value) === '') {
+                                return '不能为空！';
+                            }
+
+                        }
+                    }
+                }, {
+                    field: 'travel_stand_cost',
+                    title: '金额',
+                    align: 'center',
+                    valign: 'middle',
+                    editable: {
+                        emptytext: '点击编辑',          //空值的默认文本
+                        mode: 'inline',
+                        type: 'text',
+                        showbuttons: false,
+                        validate: function (value) {
+                            if ($.trim(value) === '') {
+                                return '不能为空！';
+                            }
+                            if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                                return ('请输入金额！')
+                            }
+                        }
+                    }
+                }
+                ]
+            ],
+            onEditableSave: function (field, row, oldValue, $el) {
+                if (field === 'travel_real_cost') {
+                    calculate_total('sub_table_2', 2);
+                } else if (field === 'travel_stand_cost') {
+                    calculate_total('sub_table_2', 2);
+                }
+            },
+            onEditableShown: function (field, row, $el, reason) {
+
+
+            },
+            onEditableHidden: function (field, row, $el, reason) {
+                if (field === 'travel_real_cost') {
+                    calculate_total('sub_table_2', 2);
+                } else if (field === 'travel_stand_cost') {
+                    calculate_total('sub_table_2', 2);
+                }
+
+
+            },
+            data: [
+                {
+                    id: uuid(),
+                    item: '',
+                    datetime: '',
+                    travel_departure: '',
+                    travel_destination: '',
+                    travel_real_position: '',
+                    travel_real_cost: '',
+                    travel_stand_position: '',
+                    travel_stand_cost: '',
+                    travel_reason: ''
+                }
+            ]
+        });
+        $(function () {
+            $tb2_add_btn.click(function () {
+                var index = $sub_table_2.bootstrapTable('getData').length;
+                var id = Number(index + 1);
+                $sub_table_2.bootstrapTable('insertRow', {
+                    index: index,
+                    row: {
+                        id: uuid(),
+                        item: '',
+                        datetime: '',
+                        travel_departure: '',
+                        travel_destination: '',
+                        travel_real_position: '',
+                        travel_real_cost: '',
+                        travel_stand_position: '',
+                        travel_stand_cost: '',
+                        travel_reason: ''
+                    }
+                });
+            });
+            $tb2_del_btn.click(function () {
+                var ids = $.map($sub_table_2.bootstrapTable('getSelections'), function (row) {
+                    return row.id
+                });
+                if (ids.length < 1) {
+                    alert("请选择一行删除!");
+                    return;
+                }
+                var selectedIDs_list = [];
+                var token = document.getElementById("token").innerHTML;
+                var username = document.getElementById("username").innerHTML;
+                var cno = $("#clf_no").val();
+                var status = $("#status").html();
+                for (var i = 0; i < ids.length; i++) {
+                    var info = {"selectedID": String(ids[i])};
+                    selectedIDs_list.push(info);
+                }
+                if (status === "0") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/2?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_2.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_2.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+                            }
+                        }
+                    });
+                    $sub_table_2.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                } else if (status === "1") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/2?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_2.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_2.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+
+                            }
+                        }
+                    });
+                    $sub_table_2.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                    {#                    console.log("保存状态下删除" + JSON.stringify(ids))#}
+                } else if (status === "2") {
+                    {#                    console.log("提交下禁止删除")#}
+                }
+            });
+        });
+    </script>
+    <script>
+        moment.locale('zh-cn');
+        $sub_table_3 = $('#sub_table_3');
+        $tb3_add_btn = $('#tb_3_add');
+        $tb3_del_btn = $('#tb_3_del');
+        selections = [];
+        $sub_table_3.bootstrapTable({
+            editable: true,
+            cache: false,
+            idField: "id",
+            columns: [[{
+                title: '市内交通明细',
+                colspan: 8,
+                align: 'center'
+            }], [{
+                field: 'state',
+                checkbox: true,
+                width: 50,
+                rowspan: 2
+            }, {
+                field: 'id',
+                title: '序号',
+                align: 'center',
+                valign: 'middle',
+                visible: false,
+                rowspan: 2,
+            }, {
+                field: 'item',
+                title: '费用项目',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    type: 'select',
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    showbuttons: false,
+                    source: [{value: "1", text: "市内交通"}, {value: "2", text: "市内轮渡"}],
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'urban_transport',
+                title: '交通工具',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    type: 'select',
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    showbuttons: false,
+                    source: [{value: "1", text: "出租车"}, {value: "2", text: "地铁轻轨"}, {
+                        value: "3",
+                        text: "市内公交车"
+                    }, {value: "4", text: "轮渡散席"}],
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'datetime',
+                title: '日期/时间',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    type: 'combodate',
+                    emptytext: '点击编辑',        //空值的默认文本
+                    locale: 'zh-cn',
+                    format: 'YYYY-MM-DD HH:mm',
+                    template: 'YYYY 年 MMM / D 日 HH : mm',
+                    combodate: {
+                        minYear: 2017,
+						maxYear: 2023,
+                        firstItem: 'name'
+                    },
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                title: '行程',
+                colspan: 2,
+                align: 'center'
+            }, {
+                field: 'urban_transport_cost',
+                title: '金额',
+                align: 'center',
+                valign: 'middle',
+                rowspan: 2,
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: 'text',
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空！';
+                        }
+                        if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                            return ('请输入金额！')
+                        }
+                    }
+                }
+            }],
+                [
+                    {
+                        field: 'urban_transport_departure',
+                        title: '出发地',
+                        align: 'center',
+                        valign: 'middle',
+                        editable: {
+                            emptytext: '点击编辑',          //空值的默认文本
+                            mode: 'inline',
+                            type: "text",
+                            validate: function (value) {
+                                if ($.trim(value) === '') {
+                                    return '不能为空!';
+                                }
+                            }
+                        }
+                    },
+                    {
+                        field: 'urban_transport_destination',
+                        title: '目的地',
+                        align: 'center',
+                        valign: 'middle',
+                        editable: {
+                            emptytext: '点击编辑',          //空值的默认文本
+                            mode: 'inline',
+                            type: 'text',
+                            validate: function (value) {
+                                if ($.trim(value) === '') {
+                                    return '不能为空！';
+                                }
+                            }
+                        }
+                    }
+                ]
+            ],
+            onEditableSave: function (field, row, oldValue, $el) {
+                if (field === 'urban_transport_cost') {
+                    calculate_total('sub_table_3', 3);
+                } else if (field === 'travel_stand_cost') {
+                    calculate_total('sub_table_3', 3);
+                }
+            },
+            onEditableShown: function (field, row, $el, reason) {
+            },
+            onEditableHidden: function (field, row, $el, reason) {
+                if (field === 'urban_transport_cost') {
+                    calculate_total('sub_table_3', 3);
+                } else if (field === 'travel_stand_cost') {
+                    calculate_total('sub_table_3', 3);
+                }
+            },
+            data: [
+                {
+                    id: uuid(),
+                    item: '',
+                    datetime: '',
+                    urban_transport: '',
+                    urban_transport_cost: '',
+                    urban_transport_departure: '',
+                    urban_transport_destination: ''
+                }
+            ]
+        });
+        $(function () {
+            $tb3_add_btn.click(function () {
+                var index = $sub_table_3.bootstrapTable('getData').length;
+                var id = Number(index + 1);
+                $sub_table_3.bootstrapTable('insertRow', {
+                    index: index,
+                    row: {
+                        id: uuid(),
+                        item: '',
+                        datetime: '',
+                        urban_transport: '',
+                        urban_transport_cost: '',
+                        urban_transport_departure: '',
+                        urban_transport_destination: ''
+                    }
+                });
+            });
+            $tb3_del_btn.click(function () {
+                var ids = $.map($sub_table_3.bootstrapTable('getSelections'), function (row) {
+                    return row.id;
+                });
+                if (ids.length < 1) {
+                    alert("请选择一行删除!");
+                    return;
+                }
+                var selectedIDs_list = [];
+                for (var i = 0; i < ids.length; i++) {
+                    var info = {"selectedID": String(ids[i])};
+                    selectedIDs_list.push(info);
+                }
+                var token = document.getElementById("token").innerHTML;
+                var username = document.getElementById("username").innerHTML;
+                var cno = $("#clf_no").val();
+                var status = $("#status").html();
+                if (status === "0") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/3?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_3.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_3.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+
+                            }
+                        }
+                    });
+                    $sub_table_3.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                } else if (status === "1") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/3?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_3.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_3.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+
+                            }
+                        }
+                    });
+                    $sub_table_3.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                    {#                    console.log("保存状态下删除"+JSON.stringify(ids))#}
+                } else if (status === "2") {
+                    {#                    console.log("提交下禁止删除")#}
+                }
+            });
+        });
+    </script>
+    <script>
+        moment.locale('zh-cn');
+        $sub_table_4 = $('#sub_table_4');
+        $tb4_add_btn = $('#tb_4_add');
+        $tb4_del_btn = $('#tb_4_del');
+        selections = [];
+        $sub_table_4.bootstrapTable({
+            editable: true,
+            cache: false,
+            idField: "id",
+            columns: [[{
+                title: '差旅住宿明细',
+                colspan: 7,
+                align: 'center'
+            }], [{
+                field: 'state',
+                checkbox: true,
+                width: 50,
+            }, {
+                field: 'id',
+                title: '序号',
+                align: 'center',
+                valign: 'middle',
+                visible: false,
+                formatter: function (value, row, index) {
+                    return index + 1;
+                }
+            }, {
+                field: 'item',
+                title: '费用项目',
+                align: 'center',
+                valign: 'middle',
+
+            }, {
+                field: 'datetime',
+                title: '日期/时间',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    type: 'combodate',
+                    emptytext: '点击编辑',        //空值的默认文本
+                    locale: 'zh-cn',
+                    format: 'YYYY-MM-DD HH:mm',
+                    template: 'YYYY 年 MMM / D 日 HH : mm',
+                    combodate: {
+                        minYear: 2017,
+						maxYear: 2023,
+                        firstItem: 'name'
+                    },
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'hotel_name',
+                title: '酒店名称',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: "text",
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'hotel_days',
+                title: '天数',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: 'text',
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空！';
+                        }
+                        if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                            return ('请输入天数！')
+                        }
+                    }
+                }
+            }, {
+                field: 'hotel_cost',
+                title: '金额',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: 'text',
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空！';
+                        }
+                        if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                            return ('请输入金额！')
+                        }
+                    }
+                }
+            }]
+            ],
+            onEditableSave: function (field, row, oldValue, $el) {
+                if (field === 'hotel_cost') {
+                    calculate_total('sub_table_4', 4);
+                }
+            },
+            onEditableShown: function (field, row, $el, reason) {
+            },
+            onEditableHidden: function (field, row, $el, reason) {
+                if (field === 'hotel_cost') {
+                    calculate_total('sub_table_4', 4);
+                }
+            },
+            data: [{
+                id: uuid(),
+                item: '差旅住宿',
+                datetime: '',
+                hotel_name: '',
+                hotel_days: '',
+                hotel_cost: ''
+            }]
+        });
+        $(function () {
+            $tb4_add_btn.click(function () {
+                var index = $sub_table_4.bootstrapTable('getData').length;
+                var id = Number(index + 1);
+                $sub_table_4.bootstrapTable('insertRow', {
+                    index: index,
+                    row: {
+                        id: uuid(),
+                        item: '差旅住宿',
+                        datetime: '',
+                        hotel_name: '',
+                        hotel_days: '',
+                        hotel_cost: ''
+                    }
+                });
+            });
+            $tb4_del_btn.click(function () {
+                var ids = $.map($sub_table_4.bootstrapTable('getSelections'), function (row) {
+                    return row.id;
+
+                });
+                if (ids.length < 1) {
+                    alert("请选择一行删除!");
+                    return;
+                }
+                var selectedIDs_list = [];
+                for (var i = 0; i < ids.length; i++) {
+                    var info = {"selectedID": String(ids[i])};
+                    selectedIDs_list.push(info);
+                }
+                var token = document.getElementById("token").innerHTML;
+                var username = document.getElementById("username").innerHTML;
+                var cno = $("#clf_no").val();
+                var status = $("#status").html();
+                if (status === "0") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/4?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_4.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_4.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+
+                            }
+                        }
+                    });
+                    $sub_table_4.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                } else if (status === "1") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/4?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_4.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_4.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+                            }
+                        }
+                    });
+                    $sub_table_4.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                    {#                    console.log("保存状态下删除"+JSON.stringify(ids))#}
+                } else if (status === "2") {
+                    {#                    console.log("提交下禁止删除")#}
+                }
+
+            });
+        });
+    </script>
+    <script>
+        moment.locale('zh-cn');
+        $sub_table_5 = $('#sub_table_5');
+        $tb5_add_btn = $('#tb_5_add');
+        $tb5_del_btn = $('#tb_5_del');
+        selections = [];
+        $sub_table_5.bootstrapTable({
+            editable: true,
+            cache: false,
+            idField: "id",
+            columns: [[{
+                title: '差旅餐费明细',
+                colspan: 6,
+                align: 'center'
+            }], [{
+                field: 'state',
+                checkbox: true,
+                width: 50,
+            }, {
+                field: 'id',
+                title: '序号',
+                align: 'center',
+                valign: 'middle',
+                visible: false,
+            }, {
+                field: 'item',
+                title: '费用项目',
+                align: 'center',
+                valign: 'middle',
+
+            }, {
+                field: 'datetime',
+                title: '日期/时间',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    type: 'combodate',
+                    emptytext: '点击编辑',        //空值的默认文本
+                    locale: 'zh-cn',
+                    format: 'YYYY-MM-DD HH:mm',
+                    template: 'YYYY 年 MMM / D 日 HH : mm',
+                    combodate: {
+                        minYear: 2017,
+						maxYear: 2023,
+                        firstItem: 'name'
+                    },
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'restaurant_name',
+                title: '餐厅名称',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: "text",
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'restaurant_cost',
+                title: '金额',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: 'text',
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空！';
+                        }
+                        if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                            return ('请输入金额！')
+                        }
+                    }
+                }
+            }]
+            ],
+            onEditableSave: function (field, row, oldValue, $el) {
+                if (field === 'restaurant_cost') {
+                    calculate_total('sub_table_5', 5);
+                }
+            },
+            onEditableShown: function (field, row, $el, reason) {
+            },
+            onEditableHidden: function (field, row, $el, reason) {
+                if (field === 'restaurant_cost') {
+                    calculate_total('sub_table_5', 5);
+                }
+            },
+            data: [{
+                id: uuid(),
+                item: '差旅餐费',
+                datetime: '',
+                restaurant_name: '',
+                restaurant_cost: ''
+
+            }]
+        });
+        $(function () {
+            $tb5_add_btn.click(function () {
+                var index = $sub_table_5.bootstrapTable('getData').length;
+                var id = Number(index + 1);
+                $sub_table_5.bootstrapTable('insertRow', {
+                    index: index,
+                    row: {
+                        id: uuid(),
+                        item: '差旅餐费',
+                        datetime: '',
+                        restaurant_name: '',
+                        restaurant_cost: ''
+                    }
+                });
+            });
+            $tb5_del_btn.click(function () {
+                var ids = $.map($sub_table_5.bootstrapTable('getSelections'), function (row) {
+                    return row.id;
+                });
+                if (ids.length < 1) {
+                    alert("请选择一行删除!");
+                    return;
+                }
+                var selectedIDs_list = [];
+                for (var i = 0; i < ids.length; i++) {
+                    var info = {"selectedID": String(ids[i])};
+                    selectedIDs_list.push(info);
+                }
+
+                var token = document.getElementById("token").innerHTML;
+                var username = document.getElementById("username").innerHTML;
+                var cno = $("#clf_no").val();
+                var status = $("#status").html();
+                if (status === "0") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/5?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_5.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_5.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+
+                            }
+                        }
+                    });
+                    $sub_table_5.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                } else if (status === "1") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/5?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_5.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_5.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+                            }
+                        }
+                    });
+                    $sub_table_5.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                    {#                    console.log("保存状态下删除"+JSON.stringify(ids))#}
+                } else if (status === "2") {
+                    {#                    console.log("提交下禁止删除")#}
+                }
+            });
+        });
+    </script>
+    <script>
+        moment.locale('zh-cn');
+        $sub_table_6 = $('#sub_table_6');
+        $tb6_add_btn = $('#tb_6_add');
+        $tb6_del_btn = $('#tb_6_del');
+        selections = [];
+        $sub_table_6.bootstrapTable({
+            editable: true,
+            cache: false,
+            idField: "id",
+            columns: [[{
+                title: '招待用餐明细',
+                colspan: 7,
+                align: 'center'
+            }], [{
+                field: 'state',
+                checkbox: true,
+                width: 50,
+            }, {
+                field: 'id',
+                title: '序号',
+                align: 'center',
+                valign: 'middle',
+                visible: false,
+            }, {
+                field: 'item',
+                title: '费用项目',
+                align: 'center',
+                valign: 'middle',
+
+            }, {
+                field: 'datetime',
+                title: '日期/时间',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    type: 'combodate',
+                    emptytext: '点击编辑',        //空值的默认文本
+                    locale: 'zh-cn',
+                    format: 'YYYY-MM-DD HH:mm',
+                    template: 'YYYY 年 MMM / D 日 HH : mm',
+                    combodate: {
+                        minYear: 2017,
+						maxYear: 2023,
+                        firstItem: 'name'
+                    },
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'restaurant_name',
+                title: '餐厅名称',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: "text",
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'avg_cost',
+                title: '人均标准',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: 'text',
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空！';
+                        }
+                        if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                            return ('请输入金额！')
+                        }
+                    }
+                }
+            }, {
+                field: 'restaurant_cost',
+                title: '金额',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: 'text',
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空！';
+                        }
+                        if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                            return ('请输入金额！')
+                        }
+                    }
+                }
+            }]
+            ],
+            onEditableSave: function (field, row, oldValue, $el) {
+                if (field === 'restaurant_cost') {
+                    calculate_total('sub_table_6', 6);
+                }
+            },
+            onEditableShown: function (field, row, $el, reason) {
+            },
+            onEditableHidden: function (field, row, $el, reason) {
+                if (field === 'restaurant_cost') {
+                    calculate_total('sub_table_6', 6);
+                }
+            },
+            data: [{
+                id: uuid(),
+                item: '招待用餐',
+                datetime: '',
+                restaurant_name: '',
+                avg_cost: '',
+                restaurant_cost: ''
+
+            }]
+        });
+        $(function () {
+            $tb6_add_btn.click(function () {
+                var index = $sub_table_6.bootstrapTable('getData').length;
+                var id = Number(index + 1);
+                $sub_table_6.bootstrapTable('insertRow', {
+                    index: index,
+                    row: {
+                        id: uuid(),
+                        item: '招待用餐',
+                        datetime: '',
+                        restaurant_name: '',
+                        avg_cost: '',
+                        restaurant_cost: ''
+                    }
+                });
+            });
+            $tb6_del_btn.click(function () {
+                var ids = $.map($sub_table_6.bootstrapTable('getSelections'), function (row) {
+                    return row.id;
+                });
+                if (ids.length < 1) {
+                    alert("请选择一行删除!");
+                    return;
+                }
+                var selectedIDs_list = [];
+                for (var i = 0; i < ids.length; i++) {
+                    var info = {"selectedID": String(ids[i])};
+                    selectedIDs_list.push(info);
+                }
+                {#                console.log(JSON.stringify(selectedIDs_list));#}
+                var token = document.getElementById("token").innerHTML;
+                var username = document.getElementById("username").innerHTML;
+                var cno = $("#clf_no").val();
+                var status = $("#status").html();
+                if (status === "0") {
+                    {#                    console.log("新增状态下删除"+JSON.stringify(ids));#}
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/6?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_6.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_6.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+                            }
+                        }
+                    });
+                    $sub_table_6.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                } else if (status === "1") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/6?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_6.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_6.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+                            }
+                        }
+                    });
+                    $sub_table_6.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                    {#                    console.log("保存状态下删除"+JSON.stringify(ids))#}
+                } else if (status === "2") {
+                    {#                    console.log("提交下禁止删除")#}
+                }
+            });
+        });
+    </script>
+    <script>
+        moment.locale('zh-cn');
+        $sub_table_7 = $('#sub_table_7');
+        $tb7_add_btn = $('#tb_7_add');
+        $tb7_del_btn = $('#tb_7_del');
+        selections = [];
+        $sub_table_7.bootstrapTable({
+            editable: true,
+            cache: false,
+            idField: "id",
+            columns: [[{
+                title: '其他事项明细',
+                colspan: 7,
+                align: 'center'
+            }], [{
+                field: 'state',
+                checkbox: true,
+                width: 50,
+            }, {
+                field: 'id',
+                title: '序号',
+                align: 'center',
+                valign: 'middle',
+                visible: false,
+            }, {
+                field: 'item',
+                title: '费用项目',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: 'text',
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空！';
+                        }
+                    }
+                }
+            }, {
+                field: 'other_context',
+                title: '内容',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: "text",
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }, {
+                field: 'other_cost',
+                title: '金额',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'inline',
+                    type: 'text',
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空！';
+                        }
+                        if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                            return ('请输入金额！')
+                        }
+                    }
+                }
+            }, {
+                field: 'other_explain',
+                title: '事项说明',
+                align: 'center',
+                valign: 'middle',
+                editable: {
+                    emptytext: '点击编辑',          //空值的默认文本
+                    mode: 'popup',
+                    type: "textarea",
+                    rows: 5,
+                    validate: function (value) {
+                        if ($.trim(value) === '') {
+                            return '不能为空!';
+                        }
+                    }
+                }
+            }]
+            ],
+            onEditableSave: function (field, row, oldValue, $el) {
+                if (field === 'other_cost') {
+                    calculate_total('sub_table_7', 7);
+                }
+            },
+            onEditableShown: function (field, row, $el, reason) {
+            },
+            onEditableHidden: function (field, row, $el, reason) {
+                if (field === 'other_cost') {
+                    calculate_total('sub_table_7', 7);
+                }
+            },
+            data: [
+                {
+                    id: uuid(),
+                    item: '',
+                    other_context: '',
+                    other_cost: '',
+                    other_explain: ''
+                }
+            ]
+        });
+        $(function () {
+            $tb7_add_btn.click(function () {
+                var index = $sub_table_7.bootstrapTable('getData').length;
+                var id = Number(index + 1);
+                $sub_table_7.bootstrapTable('insertRow', {
+                    index: index,
+                    row: {
+                        id: uuid(),
+                        item: '',
+                        other_context: '',
+                        other_cost: '',
+                        other_explain: ''
+                    }
+                });
+            });
+            $tb7_del_btn.click(function () {
+                var ids = $.map($sub_table_7.bootstrapTable('getSelections'), function (row) {
+                    return row.id;
+                });
+                if (ids.length < 1) {
+                    alert("请选择一行删除!");
+                    return;
+                }
+                var selectedIDs_list = [];
+                for (var i = 0; i < ids.length; i++) {
+                    var info = {"selectedID": String(ids[i])};
+                    selectedIDs_list.push(info);
+                }
+                var token = document.getElementById("token").innerHTML;
+                var username = document.getElementById("username").innerHTML;
+                var cno = $("#clf_no").val();
+                var status = $("#status").html();
+                if (status === "0") {
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/7?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_7.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_7.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+
+                            }
+                        }
+                    });
+                    $sub_table_7.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                } else if (status === "1") {
+
+                    $.ajax({
+                        cache: false,
+                        type: 'POST',
+                        url: $SCRIPT_ROOT + "/travel_expense/tb_delete/7?username=" + username + "&token=" + token + "&no=" + cno,
+                        data: JSON.stringify(selectedIDs_list),
+                        dataType: 'text',
+                        contentType: 'application/json; charset=UTF-8',
+                        async: false,
+                        error: function (request) {
+                            alert("连接出错，请刷新页面重新提交");
+                        },
+                        success: function (data) {
+                            if (0 == data) {
+                                $sub_table_7.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("操作数据库");#}
+                            }
+                            else if (1 == data) {
+                                $sub_table_7.bootstrapTable('remove', {
+                                    field: 'id',
+                                    values: ids
+                                });
+                                {#                                console.log("未操作数据库");#}
+
+                            }
+                            else if (2 == data) {
+                                alert("登陆超时，请刷新页面重新提交");
+
+                            }
+                        }
+                    });
+                    $sub_table_7.bootstrapTable('remove', {
+                        field: 'id',
+                        values: ids
+                    });
+                    {#                    console.log("保存状态下删除"+JSON.stringify(ids))#}
+                } else if (status === "2") {
+                    {#                    console.log("提交下禁止删除")#}
+                }
+            });
+        });
+    </script>
+    <script>
+        function cost_over_alert(value, Id, tbname, tbcolumn, hide_div_Id, sign_Id) {
+            var sum = 0;
+            var sum_real_cost = 0;
+            document.getElementById(hide_div_Id).innerHTML = '';
+            if (isNaN(Number($.trim(value)))) {  //当输入不是数字的时候，Number后返回的值是NaN;然后用isNaN判断。
+                document.getElementById(Id).value = "";
+            } else {
+                var ph1 = JSON.stringify($("#" + tbname).bootstrapTable('getData'));
+                var table_array = jQuery.parseJSON(ph1);
+                switch (tbcolumn) {
+                    case 2:
+                        document.getElementById("final_travel_reimbursement_cost").innerHTML = '';
+                        document.getElementById("final_travel_real_cost").innerHTML = '';
+                        document.getElementById("final_travel_standard_cost").innerHTML = '';
+
+                        for (var i in table_array) {
+                            sum += Number(table_array[i].travel_stand_cost);
+                            sum_real_cost += Number(table_array[i].travel_real_cost);
+                        }
+                        $("#final_travel_real_cost").append(sum_real_cost);
+                        $("#final_travel_standard_cost").append(sum);
+                        $("#final_travel_reimbursement_cost").append(value);
+                        if (Number(value) > sum) {
+                            $("#" + hide_div_Id).append('<b class="text-danger"><i class="glyphicon glyphicon-exclamation-sign"></i>注：此项报销金额已超标！</b>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "";
+                        } else {
+                            $("#" + hide_div_Id).append('<span class="glyphicon glyphicon-ok form-control-feedback" aria-hidden="true"></span>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "none";
+                        }
+                        break;
+                    case 3:
+                        document.getElementById("final_urban_reimbursement_cost").innerHTML = '';
+                        document.getElementById("final_urban_real_cost").innerHTML = '';
+                        document.getElementById("final_urban_standard_cost").innerHTML = '';
+
+                        for (var i in table_array) {
+                            sum_real_cost += Number(table_array[i].urban_transport_cost);
+                        }
+                        sum += Number(document.getElementById("traffic_one").value);
+                        $("#final_urban_real_cost").append(sum_real_cost);
+                        $("#final_urban_standard_cost").append(sum);
+                        $("#final_urban_reimbursement_cost").append(value);
+                        if (Number(value) > sum) {
+                            $("#" + hide_div_Id).append('<b class="text-danger"><i class="glyphicon glyphicon-exclamation-sign"></i>注：此项报销金额已超标！</b>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "";
+                        } else {
+                            $("#" + hide_div_Id).append('<span class="glyphicon glyphicon-ok form-control-feedback" aria-hidden="true"></span>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "none";
+                        }
+                        break;
+                    case 4:
+
+                        document.getElementById("final_hotel_reimbursement_cost").innerHTML = '';
+                        document.getElementById("final_hotel_real_cost").innerHTML = '';
+                        document.getElementById("final_hotel_standard_cost").innerHTML = '';
+                        for (var i in table_array) {
+                            sum_real_cost += Number(table_array[i].hotel_cost);
+                        }
+                        sum += Number(document.getElementById("hotel_one").value);
+                        $("#final_hotel_real_cost").append(sum_real_cost);
+                        $("#final_hotel_standard_cost").append(sum);
+                        $("#final_hotel_reimbursement_cost").append(value);
+                        if (Number(value) > sum) {
+                            $("#" + hide_div_Id).append('<b class="text-danger"><i class="glyphicon glyphicon-exclamation-sign"></i>注：此项报销金额已超标！</b>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "";
+                        } else {
+                            $("#" + hide_div_Id).append('<span class="glyphicon glyphicon-ok form-control-feedback" aria-hidden="true"></span>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "none";
+                        }
+                        break;
+                    case 5:
+                        document.getElementById("final_meals_reimbursement_cost").innerHTML = '';
+                        document.getElementById("final_meals_real_cost").innerHTML = '';
+                        document.getElementById("final_meals_standard_cost").innerHTML = '';
+                        for (var i in table_array) {
+                            sum_real_cost += Number(table_array[i].restaurant_cost);
+                        }
+                        sum += Number(document.getElementById("meals_one").value);
+                        $("#final_meals_real_cost").append(sum_real_cost);
+                        $("#final_meals_standard_cost").append(sum);
+                        $("#final_meals_reimbursement_cost").append(value);
+                        if (Number(value) > sum) {
+                            $("#" + hide_div_Id).append('<b class="text-danger"><i class="glyphicon glyphicon-exclamation-sign"></i>注：此项报销金额已超标！</b>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "";
+                        } else {
+                            $("#" + hide_div_Id).append('<span class="glyphicon glyphicon-ok form-control-feedback" aria-hidden="true"></span>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "none";
+                        }
+                        break;
+                    case 6:
+                        document.getElementById("final_restaurant_reimbursement_cost").innerHTML = '';
+                        $("#final_restaurant_reimbursement_cost").append(value);
+                        if (Number(value) > 0) {
+                            $("#" + hide_div_Id).append('<b class="text-danger"><i class="glyphicon glyphicon-exclamation-sign"></i>注：此项报销需领导签字！</b>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "";
+                        } else {
+                            $("#" + hide_div_Id).append('<span class="glyphicon glyphicon-ok form-control-feedback" aria-hidden="true"></span>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "none";
+                        }
+                        break;
+                    case 7:
+                        document.getElementById("final_other_real_cost").innerHTML = '';
+                        document.getElementById("final_other_reimbursement_cost").innerHTML = '';
+                        $("#final_other_reimbursement_cost").append(value);
+                        if (Number(value) > 0) {
+                            $("#" + hide_div_Id).append('<b class="text-danger"><i class="glyphicon glyphicon-exclamation-sign"></i>注：此项报销需领导签字！</b>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "";
+                        } else {
+                            $("#" + hide_div_Id).append('<span class="glyphicon glyphicon-ok form-control-feedback" aria-hidden="true"></span>');
+                            document.getElementById(hide_div_Id).style.display = "";
+                            document.getElementById(sign_Id).style.display = "none";
+                        }
+                        break;
+                }
+                var final_travel_reimbursement_cost = vaild_div_value(document.getElementById("final_travel_reimbursement_cost").innerText);
+                var final_urban_reimbursement_cost = vaild_div_value(document.getElementById("final_urban_reimbursement_cost").innerText);
+                var final_hotel_reimbursement_cost = vaild_div_value(document.getElementById("final_hotel_reimbursement_cost").innerText);
+                var final_meals_reimbursement_cost = vaild_div_value(document.getElementById("final_meals_reimbursement_cost").innerText);
+                var final_restaurant_reimbursement_cost = vaild_div_value(document.getElementById("final_restaurant_reimbursement_cost").innerText);
+                var final_other_reimbursement_cost = vaild_div_value(document.getElementById("final_other_reimbursement_cost").innerText);
+                var final_total = Number(final_travel_reimbursement_cost) + Number(final_urban_reimbursement_cost) + Number(final_hotel_reimbursement_cost)
+                    + Number(final_meals_reimbursement_cost) + Number(final_restaurant_reimbursement_cost) + Number(final_other_reimbursement_cost);
+                document.getElementById("final_total_reimbursement_cost").innerHTML = String(final_total);
+            }
+        }
+        function vaild_div_value(value) {
+            if (value !== null || value !== undefined || value !== '') {
+                return Number(value);
+            } else {
+                return Number(0);
+            }
+
+        }
+
+    </script>
+    <script>
+        $('#final_travel_bz').editable({
+            type: 'textarea',
+            title: '请输入备注内容',
+            emptytext: ' '          //空值的默认文本
+        });
+        $('#final_urban_bz').editable({
+            type: 'textarea',
+            title: '请输入备注内容',
+            emptytext: ' '          //空值的默认文本
+        });
+        $('#final_hotel_bz').editable({
+            type: 'textarea',
+            title: '请输入备注内容',
+            emptytext: ' '          //空值的默认文本
+        });
+        $('#final_meals_bz').editable({
+            type: 'textarea',
+            title: '请输入备注内容',
+            emptytext: ' '          //空值的默认文本
+        });
+        $('#final_restaurant_bz').editable({
+            type: 'textarea',
+            title: '请输入备注内容',
+            emptytext: ' '          //空值的默认文本
+        });
+        $('#final_other_bz').editable({
+            type: 'textarea',
+            title: '请输入备注内容',
+            emptytext: ' '          //空值的默认文本
+        });
+    </script>
+    <script>
+        $Print_btn = $('#html2print');
+        $(function () {
+            $Print_btn.click(
+                function () {
+                    update_data();
+                    $("#apply_id_valid").css("display", "none");
+                    $("#travel_reason_valid").css("display", "none");
+                    $("#one_valid").css("display", "none");
+                    $("#Print_Area").print({
+                        globalStyles: false,
+                        mediaPrint: true,
+                        stylesheet: "https://cdn.bootcss.com/bootstrap-table/1.11.1/bootstrap-table.min.css",
+                        noPrintSelector: ".no-print",
+                        iframe: true,
+                        append: null,
+                        prepend: null,
+                        manuallyCopyFormValues: true,
+                        deferred: $.Deferred(),
+                        timeout: 750,
+                        title: "差旅费报销明细表",
+                        doctype: '<!doctype html>'
+                    })
+                }
+            );
+        });
+
+    </script>
+    <script>
+        var $SCRIPT_ROOT = {{request.script_root|tojson|safe}};
+        function form_submit() {
+            var token = document.getElementById("token").innerHTML;
+            var username = document.getElementById("username").innerHTML;
+            var status = document.getElementById("status").innerHTML;
+            var result = 0;
+            $.ajax({
+                cache: false,
+                type: 'POST',
+                url: $SCRIPT_ROOT + "/travel_expense/geturlformdata?username=" + username + "&token=" + token + "&status=" + status,
+                data: $("#form_data").serializeJSON(),
+                dataType: 'text',
+                contentType: 'application/json; charset=UTF-8',
+                async: false,
+                error: function (request) {
+                    alert("连接出错，请刷新页面重新提交");
+                    result = 0;
+                },
+                success: function (data) {
+                    if (0 == data) {
+                        result = 1
+                    }
+                    else if (1 == data) {
+                        alert("数据异常，请刷新页面重新提交");
+                        result = 0
+                    }
+                    else if (2 == data) {
+                        alert("登陆超时，请刷新页面重新提交");
+                        result = 0
+                    }
+                }
+            });
+            return result
+        }
+        function sub_table_1_sbumit() {
+            var token = document.getElementById("token").innerHTML;
+            var cno = $("#clf_no").val();
+            var table_json = JSON.stringify($("#sub_table").bootstrapTable('getData'));
+            var table_array = jQuery.parseJSON(table_json);
+            var varify_data = 0;
+            var result = 0;
+            for (var i in table_array) {
+                if ((table_array[i].name || table_array[i].job_level || table_array[i].sex) === "" ||
+                    (table_array[i].name || table_array[i].job_level || table_array[i].sex) === null ||
+                    (table_array[i].name || table_array[i].job_level || table_array[i].sex) === undefined) {
+                    varify_data += 1
+                } else {
+                    varify_data += 0
+                }
+            }
+            if (varify_data === 0) {
+                $.ajax({
+                    cache: false,
+                    type: 'POST',
+                    url: $SCRIPT_ROOT + "/travel_expense/post/subtable1?cno=" + cno + "&token=" + token,
+                    data: table_json,
+                    dataType: 'text',
+                    contentType: 'application/json; charset=UTF-8',
+                    async: true,
+                    error: function (request) {
+                        alert("连接出错，请刷新页面重新提交");
+                        result = 0;
+                    },
+                    success: function (data) {
+                        result = 1
+                    }
+                });
+            } else {
+                alert("出差人登记信息尚未填写完整，请检查！");
+            }
+            return varify_data
+        }
+        function sub_table_2_sbumit() {
+            var token = document.getElementById("token").innerHTML;
+            var cno = $("#clf_no").val();
+            var table_json = JSON.stringify($("#sub_table_2").bootstrapTable('getData'));
+            var table_array = jQuery.parseJSON(table_json);
+            var result = 0;
+            $.ajax({
+                cache: false,
+                type: 'POST',
+                url: $SCRIPT_ROOT + "/travel_expense/post/subtable2?cno=" + cno + "&token=" + token,
+                data: table_json,
+                dataType: 'text',
+                contentType: 'application/json; charset=UTF-8',
+                async: true,
+                error: function (request) {
+                    alert("连接出错，请刷新页面重新提交");
+                    result = 0;
+                },
+                success: function (data) {
+                    result = 1
+                }
+            });
+            return result
+        }
+        function sub_table_3_sbumit() {
+            var token = document.getElementById("token").innerHTML;
+            var cno = $("#clf_no").val();
+            var table_json = JSON.stringify($("#sub_table_3").bootstrapTable('getData'));
+            var table_array = jQuery.parseJSON(table_json);
+            var result = 0;
+            $.ajax({
+                cache: false,
+                type: 'POST',
+                url: $SCRIPT_ROOT + "/travel_expense/post/subtable3?cno=" + cno + "&token=" + token,
+                data: table_json,
+                dataType: 'text',
+                contentType: 'application/json; charset=UTF-8',
+                async: true,
+                error: function (request) {
+                    alert("连接出错，请刷新页面重新提交");
+                    result = 0;
+                },
+                success: function (data) {
+                    {#                    alert("保存成功");#}
+                    result = 1
+                }
+            });
+            return result
+        }
+        function sub_table_4_sbumit() {
+            var token = document.getElementById("token").innerHTML;
+            var cno = $("#clf_no").val();
+            var table_json = JSON.stringify($("#sub_table_4").bootstrapTable('getData'));
+            var table_array = jQuery.parseJSON(table_json);
+            var result = 0;
+            $.ajax({
+                cache: false,
+                type: 'POST',
+                url: $SCRIPT_ROOT + "/travel_expense/post/subtable4?cno=" + cno + "&token=" + token,
+                data: table_json,
+                dataType: 'text',
+                contentType: 'application/json; charset=UTF-8',
+                async: true,
+                error: function (request) {
+                    alert("连接出错，请刷新页面重新提交");
+                    result = 0;
+                },
+                success: function (data) {
+                    result = 1
+                }
+            });
+            return result
+        }
+        function sub_table_5_sbumit() {
+            var token = document.getElementById("token").innerHTML;
+            var cno = $("#clf_no").val();
+            var table_json = JSON.stringify($("#sub_table_5").bootstrapTable('getData'));
+            var table_array = jQuery.parseJSON(table_json);
+            var result = 0;
+            $.ajax({
+                cache: false,
+                type: 'POST',
+                url: $SCRIPT_ROOT + "/travel_expense/post/subtable5?cno=" + cno + "&token=" + token,
+                data: table_json,
+                dataType: 'text',
+                contentType: 'application/json; charset=UTF-8',
+                async: true,
+                error: function (request) {
+                    alert("连接出错，请刷新页面重新提交");
+                    result = 0;
+                },
+                success: function (data) {
+                    {#                    alert("保存成功");#}
+                    result = 1
+                }
+            });
+            return result
+        }
+        function sub_table_6_sbumit() {
+            var token = document.getElementById("token").innerHTML;
+            var cno = $("#clf_no").val();
+            var table_json = JSON.stringify($("#sub_table_6").bootstrapTable('getData'));
+            var table_array = jQuery.parseJSON(table_json);
+            var result = 0;
+            $.ajax({
+                cache: false,
+                type: 'POST',
+                url: $SCRIPT_ROOT + "/travel_expense/post/subtable6?cno=" + cno + "&token=" + token,
+                data: table_json,
+                dataType: 'text',
+                contentType: 'application/json; charset=UTF-8',
+                async: true,
+                error: function (request) {
+                    alert("连接出错，请刷新页面重新提交");
+                    result = 0;
+                },
+                success: function (data) {
+                    {#                    alert("保存成功");#}
+                    result = 1
+                }
+            });
+            return result
+        }
+        function sub_table_7_sbumit() {
+            var token = document.getElementById("token").innerHTML;
+            var cno = $("#clf_no").val();
+            var table_json = JSON.stringify($("#sub_table_7").bootstrapTable('getData'));
+            var table_array = jQuery.parseJSON(table_json);
+            var result = 0;
+            $.ajax({
+                cache: false,
+                type: 'POST',
+                url: $SCRIPT_ROOT + "/travel_expense/post/subtable7?cno=" + cno + "&token=" + token,
+                data: table_json,
+                dataType: 'text',
+                contentType: 'application/json; charset=UTF-8',
+                async: true,
+                error: function (request) {
+                    alert("连接出错，请刷新页面重新提交");
+                    result = 0;
+                },
+                success: function (data) {
+                    {#                    alert("保存成功");#}
+                    result = 1
+                }
+            });
+            return result
+        }
+        function sub_table_8_sbumit() {
+            var token = document.getElementById("token").innerHTML;
+            var cno = $("#clf_no").val();
+            var final_travel_bz = document.getElementById("final_travel_bz").innerHTML;
+            var final_urban_bz = document.getElementById("final_urban_bz").innerHTML;
+            var final_hotel_bz = document.getElementById("final_hotel_bz").innerHTML;
+            var final_meals_bz = document.getElementById("final_meals_bz").innerHTML;
+            var final_restaurant_bz = document.getElementById("final_restaurant_bz").innerHTML;
+            var final_other_bz = document.getElementById("final_other_bz").innerHTML;
+            var username = document.getElementById("username").innerHTML;
+            var json = "";
+            json += "[{\"final_travel_bz\":\"" + final_travel_bz.toString() + "\",\"final_urban_bz\":\"" + final_urban_bz.toString() + "\"" +
+                ",\"final_hotel_bz\":\"" + final_hotel_bz.toString() + "\",\"final_meals_bz\":\"" + final_meals_bz.toString() + "\"" +
+                ",\"final_restaurant_bz\":\"" + final_restaurant_bz.toString() + "\",\"final_other_bz\":\"" + final_other_bz.toString() + "\"}]";
+            $.ajax({
+                cache: false,
+                type: 'POST',
+                url: $SCRIPT_ROOT + "/travel_expense/post/subtable8?cno=" + cno + "&token=" + token + "&username=" + username,
+                data: json,
+                dataType: 'text',
+                contentType: 'application/json; charset=UTF-8',
+                async: true,
+                error: function (request) {
+                    alert("连接出错，请刷新页面重新提交");
+                    result = 0;
+                },
+                success: function (data) {
+                    alert("保存成功");
+                    result = 1
+                }
+            });
+        }
+
+    </script>
+    <script>
+        var apply_id = $("#apply_id");
+        var travel_reason = $("#travel_reason");
+        var hotel_one = $("#hotel_one");
+        var traffic_one = $("#traffic_one");
+        var meals_one = $("#meals_one");
+
+        $("#modal_save").click(function () {
+            $("#btn_save_Modal").modal('hide');
+            if ((apply_id.val() && travel_reason.val() && hotel_one.val() && traffic_one.val() && meals_one.val()) !== "") {
+                $("#status").html(1);
+                if (form_submit() == 1) {
+                    if (sub_table_1_sbumit() == 0) {
+                        sub_table_2_sbumit();
+                        sub_table_3_sbumit();
+                        sub_table_4_sbumit();
+                        sub_table_5_sbumit();
+                        sub_table_6_sbumit();
+                        sub_table_7_sbumit();
+                        sub_table_8_sbumit();
+                        document.getElementById("one_valid").style.display = "none";
+                    }
+                    else {
+                        document.getElementById("one_valid").style.display = "";
+                    }
+
+                }
+            } else {
+                if (apply_id.val() === "") {
+                    document.getElementById("apply_id_valid").style.display = "";
+                } else {
+                    document.getElementById("apply_id_valid").style.display = "none";
+                }
+                if (travel_reason.val() === "") {
+                    document.getElementById("travel_reason_valid").style.display = "";
+                } else {
+                    document.getElementById("travel_reason_valid").style.display = "none";
+                }
+                if ((hotel_one.val() || traffic_one.val() || meals_one.val()) == 0 || (hotel_one.val() || traffic_one.val() || meals_one.val()) == "") {
+                    document.getElementById("one_valid").style.display = "";
+                } else {
+                    document.getElementById("one_valid").style.display = "none";
+                }
+                alert("尚有必填项未填写，请检查提示");
+            }
+        });
+        $("#modal_comfirmed").click(function () {
+            $("#status").html(2);
+            $("#btn_comfirmed_Modal").modal('hide');
+            if ((apply_id.val() && travel_reason.val() && hotel_one.val() && traffic_one.val() && meals_one.val()) !== "") {
+                if (form_submit() === 1) {
+                    sub_table_1_sbumit();
+                    sub_table_2_sbumit();
+                    sub_table_3_sbumit();
+                    sub_table_4_sbumit();
+                    sub_table_5_sbumit();
+                    sub_table_6_sbumit();
+                    sub_table_7_sbumit();
+                    sub_table_8_sbumit();
+{#                    $("#status_context").css("display", "none");#}
+{#                    $("button").attr("disabled", true);#}
+{#                    document.getElementById("html2print").disabled = false;#}
+{#                    document.getElementById("close_window").disabled = false;#}
+                    $("#status_context").css("display", "none");
+                    $("button").attr("disabled", true);
+                    $('input').attr("readonly", true);
+                    $('textarea').attr("readonly", "readonly");
+                    document.getElementById("html2print").disabled = false;
+                    document.getElementById("close_window").disabled = false;
+                    document.getElementById("modal_wd_close").disabled = false;
+                    document.getElementById("modal_close").disabled = false;
+                    document.getElementById("mini_close").disabled = false;
+                    $.fn.editable.defaults.disabled = true;
+                }
+            } else {
+                if (apply_id.val() === "") {
+                    document.getElementById("apply_id_valid").style.display = "";
+                } else {
+                    document.getElementById("apply_id_valid").style.display = "none";
+                }
+                if (travel_reason.val() === "") {
+                    document.getElementById("travel_reason_valid").style.display = "";
+                } else {
+                    document.getElementById("travel_reason_valid").style.display = "none";
+                }
+                if ((hotel_one.val() || traffic_one.val() || meals_one.val()) == 0 || (hotel_one.val() || traffic_one.val() || meals_one.val()) == "") {
+                    document.getElementById("one_valid").style.display = "";
+                } else {
+                    document.getElementById("one_valid").style.display = "none";
+                }
+                alert("尚有必填项未填写，请检查提示");
+            }
+        });
+        $("#modal_wd_close").click(
+            function () {
+                var browserName = navigator.appName;
+                var browserVer = parseInt(navigator.appVersion);
+                if (browserName == "Microsoft Internet Explorer") {
+                    var ie7 = (document.all && !window.opera && window.XMLHttpRequest) ? true : false;
+                    if (ie7) {
+                        //This method is required to close a window without any prompt for IE7 & greater versions.
+                        window.open('', '_parent', '');
+                        window.close();
+                    }
+                    else {
+                        //This method is required to close a window without any prompt for IE6
+                        this.focus();
+                        self.opener = this;
+                        self.close();
+                    }
+                } else {
+                    //For NON-IE Browsers except Firefox which doesnt support Auto Close
+                    try {
+                        this.focus();
+                        self.opener = this;
+                        self.close();
+                    }
+                    catch (e) {
+                    }
+                    try {
+                        window.open('', '_self', '');
+                        window.close();
+                    }
+                    catch (e) {
+
+                    }
+                }
+            }
+        )
+
+    </script>
+{% endblock %}
+{% block navbar %}
+    <nav class="navbar navbar-default navbar-fixed-top">
+        <div class="container">
+            <button id="btn_save" type="submit" class="btn btn-info navbar-btn" data-toggle="modal"
+                    data-target="#btn_save_Modal"><span
+                    class="glyphicon glyphicon-inbox"></span>&nbsp;暂存&nbsp;
+            </button>
+            <button id="btn_confirm_save" type="submit" class="btn btn-primary navbar-btn" data-toggle="modal"
+                    data-target="#btn_comfirmed_Modal"><span
+                    class="glyphicon glyphicon-saved"></span>&nbsp;确认提交&nbsp;
+            </button>
+            <button id="html2print" class="btn btn-default navbar-btn " type="button" title="提交后可打印"><span
+                    class="glyphicon glyphicon-print"></span>&nbsp;打印&nbsp;
+            </button>
+            <button id="close_window" class="btn btn-danger navbar-btn navbar-right" type="button" title="关闭窗口"
+                    data-toggle="modal" data-target="#wd_close_Modal"><span
+                    class="glyphicon glyphicon-remove-sign" style="font-size: 16px"></span>&nbsp;关闭&nbsp;
+            </button>
+            <div id="token" style="display:none">{{ token }}</div>
+            <div id="username" style="display:none">{{ username }}</div>
+        </div>
+    </nav>
+{% endblock %}
+{% block content %}
+    <!-- Modal -->
+    <div class="modal fade" id="btn_save_Modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button   type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                            aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="myModalLabel">提示框</h4>
+                </div>
+                <div class="modal-body">
+                    <h4>是否提交当前页面内容？</h4>
+                    <h4 class="text-muted"><i class="glyphicon glyphicon-info-sign"></i>当前为“暂存”模式，保存后不可打印</h4>
+                </div>
+                <div class="modal-footer">
+                    <button id="modal_save" type="button" class="btn btn-primary">确认</button>
+                    <button  type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="btn_comfirmed_Modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel2">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button  type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                            aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="myModalLabel2">提示框</h4>
+                </div>
+                <div class="modal-body">
+                    <h4>是否提交当前页面内容？</h4>
+                    <h4 class="text-muted"><i class="glyphicon glyphicon-info-sign"></i>当前为“确认提交”模式，保存后可打印内容，但不可再次编辑内容
+                    </h4>
+                </div>
+                <div class="modal-footer">
+                    <button id="modal_comfirmed" type="button" class="btn btn-primary">确认</button>
+                    <button  type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="wd_close_Modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel3">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button  id="mini_close" type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                            aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="myModalLabel3">提示框</h4>
+                </div>
+                <div class="modal-body">
+                    <h4>是否关闭当前页面？</h4>
+                    <h4 class="text-muted"><i class="glyphicon glyphicon-info-sign"></i>当前尚未保存的内容将丢失</h4>
+                </div>
+                <div class="modal-footer">
+                    <button id="modal_wd_close" type="button" class="btn btn-primary">确认</button>
+                    <button  id="modal_close" type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container text-center" id="Print_Area">
+        <div class="text-center">
+            <h3>差旅费报销明细表</h3>
+            <div id="status_context">（未提交）</div>
+            <div id="status" style="display: none">{{ status }}</div>
+        </div>
+        <form class="form-inline text-left" action="" id="form_data" method="post">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="clf_no">NO:</label>
+                        <input type="text" class="form-control" id="clf_no" name="clf_no" value="{{ no }}" readonly>
+
+                    </div>
+
+                </div>
+            </div>
+            <HR align=center color=#987cb9 SIZE=1 class="no-print">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label for="apply_id">申请人：</label>
+                        <input type="text" class="form-control" id="apply_id" name="apply_id" value="{{ oa_name }}"
+                               placeholder="请填写申请人，必填项">
+                        <div id="apply_id_valid" style="display:none;" class="no-print"><b class="text-danger"><i
+                                class="glyphicon glyphicon-asterisk"></i>&nbsp;必填项</b></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label for="apply_bm_text">申请部门：</label>
+                        <input type="text" class="form-control" id="apply_bm_text" name="apply_bm_text"
+                               value="{{ oa_orgname }}" readonly>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label for="apply_date">申请时间：</label>
+                        <input type="text" class="form-control" id="apply_date" name="apply_date" readonly>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-12">
+                    <label for="travel_reason">事&nbsp;&nbsp;&nbsp;由：</label>
+                    <div class="form-group">
+                        <textarea rows="2" class="form-control" id="travel_reason" name="travel_reason"
+                                  style="width: 690px" placeholder="请填写事由，必填项"></textarea>
+                        <div id="travel_reason_valid" style="display:none;" class="no-print"><b class="text-danger"><i
+                                class="glyphicon glyphicon-asterisk"></i>&nbsp;必填项</b></div>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <HR align=center color=#987cb9 SIZE=1 class="no-print">
+            <div id="toolbar" class="no-print">
+                <div class="row">
+                    <div class="col-md-2">
+                        <button id="b_add" class="btn btn-primary" type="button"><i
+                                class="glyphicon glyphicon-plus"></i>&nbsp;增行
+                        </button>
+                        <button id="b_del" class="btn btn-danger" type="button"><i
+                                class="glyphicon glyphicon-minus"></i>&nbsp;删行
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="text-center">
+                        <table id="sub_table"></table>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-2">
+                    <h4>报销额度合计</h4>
+                </div>
+                <div class="col-md-3">
+                    <label for="hotel_one">住宿费:</label>
+                    <input type="text" class="form-control" id="hotel_one" name="hotel_one" placeholder="请依次填写表格内容"
+                           readonly>
+                </div>
+                <div class="col-md-3">
+                    <label for="traffic_one">交通费:</label>
+                    <input type="text" class="form-control" id="traffic_one" name="traffic_one" placeholder="请依次填写表格内容"
+                           readonly>
+                </div>
+                <div class="col-md-4">
+                    <label for="meals_one">工作餐费:</label>
+                    <input type="text" class="form-control" id="meals_one" name="meals_one" placeholder="请依次填写表格内容"
+                           readonly>
+                </div>
+            </div>
+            <div id="one_valid" style="display:none;"><b class="text-danger"><i
+                    class="glyphicon glyphicon-asterisk"></i>&nbsp;表格填写不完整</b></div>
+
+            <HR align=center color=#987cb9 SIZE=1 class="no-print">
+            <div id="toolbar_2" class="no-print">
+                <div class="row">
+                    <div class="col-md-2">
+                        <button id="tb_2_add" class="btn btn-primary" type="button"><i
+                                class="glyphicon glyphicon-plus"></i>&nbsp;增行
+                        </button>
+                        <button id="tb_2_del" class="btn btn-danger" type="button"><i
+                                class="glyphicon glyphicon-minus"></i>&nbsp;删行
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="text-center">
+                        <table id="sub_table_2"></table>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="travel_reimbursement_cost">旅途交通报销金额:</label>
+                    <input type="text" class="form-control" id="travel_reimbursement_cost"
+                           name="travel_reimbursement_cost" placeholder="请输入实际报销金额"
+                           aria-describedby="inputGroupSuccess1Status"
+                           onchange="cost_over_alert(this.value,this.id,'sub_table_2',2,'travel_over_cost_div','final_travel_over_cost_sign')">
+                    <div id="travel_over_cost_div" style="display:none;"></div>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_travel_real_cost">实际费用合计:</label>
+                    <input type="text" class="form-control" id="total_travel_real_cost" name="total_travel_real_cost"
+                           readonly>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_travel_standard_cost">报销标准合计:</label>
+                    <input type="text" class="form-control" id="total_travel_standard_cost"
+                           name="total_travel_standard_cost" readonly>
+                </div>
+            </div>
+            <HR align=center color=#987cb9 SIZE=1 class="no-print">
+            <div id="toolbar_3" class="no-print">
+                <div class="row">
+                    <div class="col-md-2">
+                        <button id="tb_3_add" class="btn btn-primary" type="button"><i
+                                class="glyphicon glyphicon-plus"></i>&nbsp;增行
+                        </button>
+                        <button id="tb_3_del" class="btn btn-danger" type="button"><i
+                                class="glyphicon glyphicon-minus"></i>&nbsp;删行
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="text-center">
+                        <table id="sub_table_3"></table>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="urban_reimbursement_cost">市内交通报销金额:</label>
+                    <input type="text" class="form-control" id="urban_reimbursement_cost"
+                           name="urban_reimbursement_cost" placeholder="请输入实际报销金额"
+                           onchange="cost_over_alert(this.value,this.id,'sub_table_3',3,'urban_over_cost_div','final_urban_over_cost_sign')">
+                    <div id="urban_over_cost_div" style="display:none;">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_urban_real_cost">实际金额合计:</label>
+                    <input type="text" class="form-control" id="total_urban_real_cost" name="total_urban_real_cost"
+                           readonly>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_urban_standard_cost">报销额度:</label>
+                    <input type="text" class="form-control" id="total_urban_standard_cost"
+                           name="total_urban_standard_cost" readonly>
+                </div>
+            </div>
+            <HR align=center color=#987cb9 SIZE=1 class="no-print">
+            <div id="toolbar_4" class="no-print">
+                <div class="row">
+                    <div class="col-md-2">
+                        <button id="tb_4_add" class="btn btn-primary" type="button"><i
+                                class="glyphicon glyphicon-plus"></i>&nbsp;增行
+                        </button>
+                        <button id="tb_4_del" class="btn btn-danger" type="button"><i
+                                class="glyphicon glyphicon-minus"></i>&nbsp;删行
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="text-center">
+                        <table id="sub_table_4"></table>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="hotel_reimbursement_cost">差旅住宿报销金额:</label>
+                    <input type="text" class="form-control" id="hotel_reimbursement_cost"
+                           name="hotel_reimbursement_cost" placeholder="请输入实际报销金额"
+                           onchange="cost_over_alert(this.value,this.id,'sub_table_4',4,'hotel_over_cost_div','final_hotel_over_cost_sign')">
+                    <div id="hotel_over_cost_div" style="display:none;"></div>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_hotel_real_cost">实际金额合计:</label>
+                    <input type="text" class="form-control" id="total_hotel_real_cost" name="total_hotel_real_cost"
+                           readonly>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_hotel_standard_cost">报销额度:</label>
+                    <input type="text" class="form-control" id="total_hotel_standard_cost"
+                           name="total_hotel_standard_cost" readonly>
+                </div>
+
+            </div>
+            <HR align=center color=#987cb9 SIZE=1 class="no-print">
+            <div id="toolbar_5" class="no-print">
+                <div class="row">
+                    <div class="col-md-2">
+                        <button id="tb_5_add" class="btn btn-primary" type="button"><i
+                                class="glyphicon glyphicon-plus"></i>&nbsp;增行
+                        </button>
+                        <button id="tb_5_del" class="btn btn-danger" type="button"><i
+                                class="glyphicon glyphicon-minus"></i>&nbsp;删行
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="text-center">
+                        <table id="sub_table_5"></table>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="meals_reimbursement_cost">差旅餐费报销金额:</label>
+                    <input type="text" class="form-control" id="meals_reimbursement_cost"
+                           name="meals_reimbursement_cost" placeholder="请输入实际报销金额"
+                           onchange="cost_over_alert(this.value,this.id,'sub_table_5',5,'meals_over_cost_div','final_meals_over_cost_sign')">
+                    <div id="meals_over_cost_div" style="display:none;"></div>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_meals_real_cost">实际金额合计:</label>
+                    <input type="text" class="form-control" id="total_meals_real_cost" name="total_meals_real_cost"
+                           readonly>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_meals_standard_cost">报销额度:</label>
+                    <input type="text" class="form-control" id="total_meals_standard_cost"
+                           name="total_meals_standard_cost" readonly>
+                </div>
+            </div>
+            <HR align=center color=#987cb9 SIZE=1 class="no-print">
+            <div id="toolbar_6" class="no-print">
+                <div class="row">
+                    <div class="col-md-2">
+                        <button id="tb_6_add" class="btn btn-primary" type="button"><i
+                                class="glyphicon glyphicon-plus"></i>&nbsp;增行
+                        </button>
+                        <button id="tb_6_del" class="btn btn-danger" type="button"><i
+                                class="glyphicon glyphicon-minus"></i>&nbsp;删行
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="text-center">
+                        <table id="sub_table_6"></table>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="meals_reimbursement_cost">招待用餐金额:</label>
+                    <input type="text" class="form-control" id="restaurant_reimbursement_cost"
+                           name="restaurant_reimbursement_cost" placeholder="请输入实际报销金额"
+                           onchange="cost_over_alert(this.value,this.id,'sub_table_6',6,'restaurant_over_cost_div','final_restaurant_over_cost_sign')">
+                    <div id="restaurant_over_cost_div" style="display:none;"></div>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_restaurant_real_cost">实际金额合计:</label>
+                    <input type="text" class="form-control" id="total_restaurant_real_cost"
+                           name="total_restaurant_real_cost" readonly>
+                </div>
+            </div>
+            <p></p>
+            <HR align=center color=#987cb9 SIZE=1 class="no-print">
+            <div id="toolbar_7" class="no-print">
+                <div class="row">
+                    <div class="col-md-2">
+                        <button id="tb_7_add" class="btn btn-primary" type="button"><i
+                                class="glyphicon glyphicon-plus"></i>&nbsp;增行
+                        </button>
+                        <button id="tb_7_del" class="btn btn-danger" type="button"><i
+                                class="glyphicon glyphicon-minus"></i>&nbsp;删行
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="text-center">
+                        <table id="sub_table_7"></table>
+                    </div>
+                </div>
+            </div>
+            <p></p>
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="meals_reimbursement_cost">其他事项金额:</label>
+                    <input type="text" class="form-control" id="other_reimbursement_cost"
+                           name="other_reimbursement_cost" placeholder="请输入实际报销金额"
+                           onchange="cost_over_alert(this.value,this.id,'sub_table_7',7,'other_over_cost_div','final_other_over_cost_sign')">
+                    <div id="other_over_cost_div" style="display:none;"></div>
+                </div>
+                <div class="col-md-4">
+                    <label for="total_other_real_cost">实际金额合计:</label>
+                    <input type="text" class="form-control" id="total_other_real_cost" name="total_other_real_cost"
+                           readonly>
+                </div>
+            </div>
+            <p></p>
+            <HR align=center color=#987cb9 SIZE=1 class="no-print">
+            <div style="page-break-before:always;">
+                <div class="text-center">
+                    <h3>差旅费报销明细汇总表</h3>
+                </div>
+                <div class="text-center">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label>费用报销项目</label>
+                        </div>
+                        <div class="col-md-2">
+                            <label>发票金额</label>
+                        </div>
+                        <div class="col-md-2">
+                            <label>报销标准</label>
+                        </div>
+                        <div class="col-md-2">
+                            <label>报销金额</label>
+                        </div>
+                        <div class="col-md-3">
+                            <label>备注</label>
+                        </div>
+                    </div>
+                    <div id="final_1">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label>①旅途交通报销金额</label>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_travel_real_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_travel_standard_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_travel_reimbursement_cost">0</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div id="final_travel_bz"></div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="final_travel_over_cost_sign" class="text-left text-danger"
+                                     style="display: none"><strong>旅途交通报销金额已超标，同意超额报销请签字:</strong>
+                                    <p>&nbsp;</p>
+                                    <HR align=center color=#987cb9 SIZE=1>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="final_2">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label>②市内交通报销金额</label>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_urban_real_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_urban_standard_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_urban_reimbursement_cost">0</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div id="final_urban_bz"></div>
+
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="final_urban_over_cost_sign" class="text-left text-danger"
+                                     style="display: none"><strong>市内交通报销金额已超标，同意超额报销请签字:</strong>
+                                    <p>&nbsp;</p>
+                                    <HR align=center color=#987cb9 SIZE=1>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="final_3">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label>③差旅住宿报销金额</label>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_hotel_real_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_hotel_standard_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_hotel_reimbursement_cost">0</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div id="final_hotel_bz"></div>
+
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="final_hotel_over_cost_sign" class="text-left text-danger"
+                                     style="display: none"><strong>差旅住宿报销金额报已超标，同意超额报销请签字:</strong>
+                                    <p>&nbsp;</p>
+                                    <HR align=center color=#987cb9 SIZE=1>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="final_4">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label>④差旅餐费报销金额</label>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_meals_real_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_meals_standard_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_meals_reimbursement_cost">0</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div id="final_meals_bz"></div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="final_meals_over_cost_sign" class="text-left text-danger"
+                                     style="display: none"><strong>差旅餐费报销金额报已超标，同意超额报销请签字:</strong>
+                                    <p>&nbsp;</p>
+                                    <HR align=center color=#987cb9 SIZE=1>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="final_5">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label>⑤招待用餐金额</label>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_restaurant_real_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_restaurant_standard_cost">-</div>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_restaurant_reimbursement_cost">0</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div id="final_restaurant_bz"></div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="final_restaurant_over_cost_sign" class="text-left text-danger"
+                                     style="display: none"><strong>招待用餐同意报销请签字:</strong>
+                                    <p>&nbsp;</p>
+                                    <HR align=center color=#987cb9 SIZE=1>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="final_6">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label>⑥其他事项金额</label>
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_other_real_cost"></div>
+                                -
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_other_standard_cost"></div>
+                                -
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_other_reimbursement_cost">0</div>
+                            </div>
+                            <div class="col-md-3">
+                                <div id="final_other_bz"></div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="final_other_over_cost_sign" class="text-left text-danger"
+                                     style="display: none"><strong>其他事项同意报销请签字:</strong>
+                                    <p>&nbsp;</p>
+                                    <HR align=center color=#987cb9 SIZE=1>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="final_7">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label>合计</label>
+                            </div>
+                            <div class="col-md-2">
+                                -
+                            </div>
+                            <div class="col-md-2">
+                                -
+                            </div>
+                            <div class="col-md-2">
+                                <div id="final_total_reimbursement_cost">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="final_8">
+                        <div class="row">
+                            <div class="col-md-3">&nbsp;
+                            </div>
+                            <div class="col-md-3">&nbsp;
+                            </div>
+                            <div class="col-md-3">&nbsp;
+                            </div>
+                            <div class="col-md-3">
+                                <label>制表人：</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}

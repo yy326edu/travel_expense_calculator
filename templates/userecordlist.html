@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}提交的差旅费报销明细记录{% endblock %}
+{% block scripts %}
+    {{ super() }}
+    <script>
+        $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+        $rc_table = $('#rc_table');
+        var token = document.getElementById("token").innerHTML;
+        var username = document.getElementById("username").innerHTML;
+        function click_href(value) {
+            return '<a class="opener" href=javascript:void(0) title="打开明细表">' + value + '</a>';
+        }
+        window.actionEvents = {
+        'click .opener': function(e, value, row, index) {
+              window.open('/travel_expense/showForm?token=' + token + '&username=' + username+'&no='+value);
+            }
+        };
+        $rc_table.bootstrapTable({
+            url: $SCRIPT_ROOT + '/travel_expense/get/rc_table?token=' + token + "&username=" + username,         //请求后台的URL（*）
+            method: 'get',
+            idField: "ID",
+            cache: false,
+            striped: true,
+            pagination: true,
+            sidePagination: 'client',
+            smartDisplay: true,
+            pageList: '[10, 20, 50, 100]',
+            search: true,
+            strictSearch: false,
+            clickToSelect: false,
+            toolbar:"#toolbar",
+             onCheck: function (row) {
+                    if(row.status=="已提交"){
+                        alert("已提交记录不能删除！");
+                        $rc_table.bootstrapTable('uncheckBy', {field:'ID', values:[row.ID]});
+                    }
+                },
+            onCheckAll: function (row) {
+                var table_array = jQuery.parseJSON(JSON.stringify(row));
+                var arr_ID=[];
+                   for (var i in table_array) {
+                        var ID = table_array[i].ID;
+                        var status = table_array[i].status;
+                       if(status=="已提交"){
+                           arr_ID.push(ID)
+                        }
+                   }
+                    $rc_table.bootstrapTable('uncheckBy', {field:'ID', values:arr_ID});
+                },
+            columns: [{
+                field: 'state',
+                checkbox: true,
+                width: 50,
+
+            }, {
+                field: 'ID',
+                title: '序号',
+                align: 'center',
+                valign: 'middle',
+                visible: false,
+
+            }, {
+                field: 'clf_no',
+                title: 'No',
+                align: 'center',
+                valign: 'middle',
+                formatter:click_href,
+{#                events: window_openner(this.value),#}
+                events:'actionEvents',
+
+
+            }, {
+                field: 'apply_date',
+                title: '申请日期',
+                align: 'center',
+                valign: 'middle',
+
+            }, {
+                field: 'apply_reason',
+                title: '申请事由',
+                align: 'center',
+                valign: 'middle',
+
+            }, {
+                field: 'travel_name',
+                title: '出差人',
+                align: 'center',
+                valign: 'middle',
+
+            }, {
+                field: 'travel_city',
+                title: '出差城市',
+                align: 'center',
+                valign: 'middle',
+            }, {
+                field: 'status',
+                title: '状态',
+                align: 'center',
+                valign: 'middle',
+            }]
+        });
+        $rc_add_btn = $("#rc_add_btn");
+        $del_btn = $("#rc_del_btn");
+        $rc_add_btn.click(
+            function () {
+                window.open('/travel_expense/addForm?token=' + token + '&username=' + username);
+            });
+        $del_btn.click(function () {
+            var ids = $.map($rc_table.bootstrapTable('getSelections'), function (row) {
+                return row.ID;
+            });
+             if (ids.length < 1) {
+                alert("请选择一行删除!");
+                return;
+            }
+            var selectedIDs_list = [];
+            for (var i = 0; i < ids.length; i++) {
+                var info = {"selectedID": String(ids[i])};
+                selectedIDs_list.push(info);            }
+            var token = document.getElementById("token").innerHTML;
+            var username = document.getElementById("username").innerHTML;
+            $.ajax({
+                cache: false,
+                type: 'POST',
+                url: $SCRIPT_ROOT + "/travel_expense/user_rc_delete?username=" + username + "&token=" + token,
+                data: JSON.stringify(selectedIDs_list),
+                dataType: 'text',
+                contentType: 'application/json; charset=UTF-8',
+                async: false,
+                error: function (request) {
+                    alert("连接出错，请刷新页面重新提交");
+                },
+                success: function (data) {
+                    if (0 == data) {
+                        $rc_table.bootstrapTable('remove', {
+                            field: 'id',
+                            values: ids
+                        });
+                    }
+                    else if (1 == data) {
+                        $rc_table.bootstrapTable('remove', {
+                            field: 'id',
+                            values: ids
+                        });
+                    }
+                    else if (2 == data) {
+                        alert("登陆超时，请刷新页面重新提交");
+                    }
+                }
+            });
+            $rc_table.bootstrapTable('refresh');
+        });
+    </script>
+
+{% endblock %}
+{% block navbar %}
+    <div id="token" style="display:none">{{ token }}</div>
+    <div id="username" style="display:none">{{ username }}</div>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <div  id="toolbar">
+            <button id="rc_add_btn" class="btn btn-primary" type="button"><i
+                class="glyphicon glyphicon-plus"></i>&nbsp;新增记录
+            </button>
+            <button id="rc_del_btn" class="btn btn-danger" type="button"><i
+                    class="glyphicon glyphicon-minus"></i>&nbsp;删除记录
+            </button>
+        </div>
+        <p></p>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="text-center">
+                    <table id="rc_table"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
